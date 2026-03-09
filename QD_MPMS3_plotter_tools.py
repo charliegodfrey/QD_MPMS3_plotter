@@ -143,7 +143,11 @@ class DualMHMeasurement:
         self.m2 = np.array(self.dataset2.get_column('Moment (emu)'))
 
     def subtract_diamagnetic_background(self, Hc=7000, max_H=15000):
-        """Subtracts the diamagnetic background from both datasets."""
+        """Subtracts the diamagnetic background from both datasets.
+        Hc is the approximate coercive field of the sample - we don't perform flattening using any data within
+        +- Hc.
+        We also only use data within +- max_H to avoid fitting to noisy data at very high fields
+        """
         fitrange = np.where(_or(_and(self.h1<-Hc, self.h1>-max_H), _and(self.h1>Hc, self.h1<max_H)))
 
         coeffs1 = np.polyfit(self.h1[fitrange], self.m1[fitrange], 1)

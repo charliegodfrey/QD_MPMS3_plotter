@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from io import StringIO
+from numpy import logical_or as _or
+from numpy import logical_and as _and
 
 class MPMSDataset:
     """
@@ -93,7 +95,7 @@ class MTMeasurement(MPMSDataset):
         ax.set_title(title)
         ax.grid(True)
         
-        return ax
+        return fig, ax
 
     def calculate_susceptibility(self, applied_field):
         """Calculates X = M / H."""
@@ -121,7 +123,7 @@ class MHMeasurement(MPMSDataset):
         ax.axvline(0, color='black', linewidth=0.5)
         ax.grid(True)
         
-        return ax
+        return fig, ax
 
 
 class DualMHMeasurement:
@@ -134,6 +136,35 @@ class DualMHMeasurement:
     def __init__(self, filepath1, filepath2):
         self.dataset1 = MHMeasurement(filepath1)
         self.dataset2 = MHMeasurement(filepath2)
+        self.difference = None  # Placeholder for any calculated difference between the two datasets
+        self.h1 = np.array(self.dataset1.get_column('Magnetic Field (Oe)'))
+        self.h2 = np.array(self.dataset2.get_column('Magnetic Field (Oe)'))
+        self.m1 = np.array(self.dataset1.get_column('Moment (emu)'))
+        self.m2 = np.array(self.dataset2.get_column('Moment (emu)'))
+
+    def subtract_diamagnetic_background(self):
+        """Subtracts the diamagnetic background from both datasets."""
+        fitrange = np.where(_or(_and(self.h1<-10000, self.h1>-25000), _and(self.h1>10000, self.h1<25000)))
+
+        coeffs1 = np.polyfit(self.h1[fitrange], self.m1[fitrange], 1)
+        coeffs2 = np.polyfit(self.h2[fitrange], self.m2[fitrange], 1)
+
+        background1 = np.polyval(coeffs1, self.h1)
+        background2 = np.polyval(coeffs2, self.h2)
+        self.m1 = self.m1 - background1
+        self.m2 = self.m2 - background2
+
+        self.difference = self.m2 - self.m1
+
+        # Remove the slope in the difference as well
+        a, b, c, d = [-15000,-5000,5000,15000]
+        fitrange1 = np.where(_and(self.h1 > a, self.h1 < b))
+        fitrange2 = np.where(_and(self.h1 > c, self.h1 < d))
+        coeffs_diff1 = np.polyfit(self.h1[fitrange1], self.difference[fitrange1], 1)
+        coeffs_diff2 = np.polyfit(self.h1[fitrange2], self.difference[fitrange2], 1)
+        background_diff = np.polyval([0.5*(coeffs_diff1[0]+coeffs_diff2[0]), 0.5*(coeffs_diff1[1]+coeffs_diff2[1])], self.h1)
+        self.difference = self.difference - background_diff
+
 
     def plot_m_vs_h(self, ax=None, title="Hysteresis Loop Comparison"):
         """Plots both MH datasets on the same axes for comparison."""
@@ -167,4 +198,4 @@ class DualMHMeasurement:
         ax.grid(True)
         ax.legend()
         
-        return ax
+        return fig, ax

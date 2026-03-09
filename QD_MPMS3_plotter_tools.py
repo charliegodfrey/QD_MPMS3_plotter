@@ -142,9 +142,9 @@ class DualMHMeasurement:
         self.m1 = np.array(self.dataset1.get_column('Moment (emu)'))
         self.m2 = np.array(self.dataset2.get_column('Moment (emu)'))
 
-    def subtract_diamagnetic_background(self):
+    def subtract_diamagnetic_background(self, Hc=7000, max_H=15000):
         """Subtracts the diamagnetic background from both datasets."""
-        fitrange = np.where(_or(_and(self.h1<-10000, self.h1>-25000), _and(self.h1>10000, self.h1<25000)))
+        fitrange = np.where(_or(_and(self.h1<-Hc, self.h1>-max_H), _and(self.h1>Hc, self.h1<max_H)))
 
         coeffs1 = np.polyfit(self.h1[fitrange], self.m1[fitrange], 1)
         coeffs2 = np.polyfit(self.h2[fitrange], self.m2[fitrange], 1)
@@ -157,7 +157,7 @@ class DualMHMeasurement:
         self.difference = self.m2 - self.m1
 
         # Remove the slope in the difference as well
-        a, b, c, d = [-15000,-5000,5000,15000]
+        a, b, c, d = [-max_H,-Hc,Hc,max_H]
         fitrange1 = np.where(_and(self.h1 > a, self.h1 < b))
         fitrange2 = np.where(_and(self.h1 > c, self.h1 < d))
         coeffs_diff1 = np.polyfit(self.h1[fitrange1], self.difference[fitrange1], 1)
@@ -171,24 +171,16 @@ class DualMHMeasurement:
         if ax is None:
             fig, ax = plt.subplots()
         
-        # Plot first dataset
-        field1 = np.array(self.dataset1.get_column('Magnetic Field (Oe)'))
-        moment1 = np.array(self.dataset1.get_column('Moment (emu)'))
         # Label with temperature from metadata if available, otherwise use generic labels
         temp1 = np.round(np.mean(self.dataset1.get_column('Temperature (K)')), 1) if 'Temperature (K)' in self.dataset1.data.columns else 'Unknown Temp'
-        
-        
-        # Plot second dataset
-        field2 = np.array(self.dataset2.get_column('Magnetic Field (Oe)'))
-        moment2 = np.array(self.dataset2.get_column('Moment (emu)'))
         temp2 = np.round(np.mean(self.dataset2.get_column('Temperature (K)')), 1) if 'Temperature (K)' in self.dataset2.data.columns else 'Unknown Temp'
         
 
         # If 
 
         # Plot both datasets with different colors and a legend
-        ax.plot(field1, moment1, marker='o', linestyle='-', markersize=4, label=f'Dataset 1 ({temp1} K)')
-        ax.plot(field2, moment2, marker='o', linestyle='-', markersize=4, label=f'Dataset 2 ({temp2} K)')
+        ax.plot(self.h1, self.m1, marker='o', linestyle='-', markersize=4, label=f'Dataset 1 ({temp1} K)')
+        ax.plot(self.h2, self.m2, marker='o', linestyle='-', markersize=4, label=f'Dataset 2 ({temp2} K)')
         
         ax.set_xlabel("Magnetic Field (Oe)")
         ax.set_ylabel("Moment (emu)")
@@ -197,5 +189,27 @@ class DualMHMeasurement:
         ax.axvline(0, color='black', linewidth=0.5)
         ax.grid(True)
         ax.legend()
+        
+        return fig, ax
+    
+    def plot_difference(self, ax=None, H_field_lims=None, M_limits=None, title="Difference in M-H Curves"):
+        """Plots the difference between the two MH datasets."""
+        if self.difference is None:
+            raise ValueError("Difference not calculated. Please run subtract_diamagnetic_background() first.")
+        
+        if ax is None:
+            fig, ax = plt.subplots()
+        
+        ax.plot(self.h1, self.difference, marker='o', linestyle='-', markersize=4)
+        ax.set_xlabel("Magnetic Field (Oe)")
+        ax.set_ylabel("Difference in Moment (emu)")
+        ax.set_title(title)
+        ax.axhline(0, color='black', linewidth=0.5)
+        ax.axvline(0, color='black', linewidth=0.5)
+        ax.grid(True)
+        if H_field_lims is not None:
+            ax.set_xlim(-H_field_lims, H_field_lims)
+        if M_limits is not None:
+            ax.set_ylim(-M_limits, M_limits)
         
         return fig, ax

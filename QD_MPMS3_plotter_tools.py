@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from io import StringIO
 
@@ -119,5 +120,51 @@ class MHMeasurement(MPMSDataset):
         ax.axhline(0, color='black', linewidth=0.5)
         ax.axvline(0, color='black', linewidth=0.5)
         ax.grid(True)
+        
+        return ax
+
+
+class DualMHMeasurement:
+    """
+    Subclass to handle two MH datasets, one at low Temperature and one at high Temperature, for direct comparison.
+    
+    The constructor should take two file paths, load both datasets, and store them as attributes.
+    The plot_m_vs_h method should be overridden to plot both datasets on the same axes with different colors and a legend.
+    """
+    def __init__(self, filepath1, filepath2):
+        self.dataset1 = MHMeasurement(filepath1)
+        self.dataset2 = MHMeasurement(filepath2)
+
+    def plot_m_vs_h(self, ax=None, title="Hysteresis Loop Comparison"):
+        """Plots both MH datasets on the same axes for comparison."""
+        if ax is None:
+            fig, ax = plt.subplots()
+        
+        # Plot first dataset
+        field1 = np.array(self.dataset1.get_column('Magnetic Field (Oe)'))
+        moment1 = np.array(self.dataset1.get_column('Moment (emu)'))
+        # Label with temperature from metadata if available, otherwise use generic labels
+        temp1 = np.round(np.mean(self.dataset1.get_column('Temperature (K)')), 1) if 'Temperature (K)' in self.dataset1.data.columns else 'Unknown Temp'
+        
+        
+        # Plot second dataset
+        field2 = np.array(self.dataset2.get_column('Magnetic Field (Oe)'))
+        moment2 = np.array(self.dataset2.get_column('Moment (emu)'))
+        temp2 = np.round(np.mean(self.dataset2.get_column('Temperature (K)')), 1) if 'Temperature (K)' in self.dataset2.data.columns else 'Unknown Temp'
+        
+
+        # If 
+
+        # Plot both datasets with different colors and a legend
+        ax.plot(field1, moment1, marker='o', linestyle='-', markersize=4, label=f'Dataset 1 ({temp1} K)')
+        ax.plot(field2, moment2, marker='o', linestyle='-', markersize=4, label=f'Dataset 2 ({temp2} K)')
+        
+        ax.set_xlabel("Magnetic Field (Oe)")
+        ax.set_ylabel("Moment (emu)")
+        ax.set_title(title)
+        ax.axhline(0, color='black', linewidth=0.5)
+        ax.axvline(0, color='black', linewidth=0.5)
+        ax.grid(True)
+        ax.legend()
         
         return ax
